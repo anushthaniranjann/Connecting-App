@@ -3,8 +3,8 @@ const http = require('http')
 const express = require('express')
 const socketio = require('socket.io')
 const Filter = require('bad-words')
-const {generateMessage} = require('./utils/messages')
-const {generateLocationMessage} = require('./utils/messages')
+const { generateMessage } = require('./utils/messages')
+const { generateLocationMessage } = require('./utils/messages')
 
 const app = express()
 const server = http.createServer(app)
@@ -19,35 +19,41 @@ app.use(express.static(publicDirectoryPath))
 //client(emit) => server (receiver) = increment   
 
 io.on('connection', (socket) => {
-    console.log('New websocket connection')
+        console.log('New websocket connection')
 
-    socket.emit('message', generateMessage('Hello'))
-    socket.broadcast.emit('message', generateMessage('A new user has joined'))
+        socket.on('join', ({ username, room }) => {
+            socket.join(room)
 
-    socket.on('sendMessage', (message, callback) => {
-        
-       const filter = new Filter()
+            socket.emit('message', generateMessage('Welcome'))
+            socket.broadcast.to(room).emit('message', generateMessage(`${username} has joined`))
 
-       if(filter.isProfane(message)) {
-           return callback('Profanity is not allowed')
-       }
-       
-        io.emit('message', generateMessage(message))  //emit event to every client
-        callback()
+            //socket.emit, io.emit,  socket.broadcast.emit
+            //io.to.emit
+        })
+
+        socket.on('sendMessage', (message, callback) => {
+
+            const filter = new Filter()
+
+            if (filter.isProfane(message)) {
+                return callback('Profanity is not allowed')
+            }
+
+            io.to('Delhi').emit('message', generateMessage(message)) //emit event to every client
+            callback()
+        })
+
+
+        socket.on('sendLocation', (coords, callback) => {
+            io.emit('locationMessage', generateLocationMessage(`https://google.com/maps?=${coords.latitude},${coords.longitude}`))
+            callback()
+        })
+
+        socket.on('disconnect', () => {
+            io.emit('message', generateMessage('A user has left!')) // when user left
+        })
     })
-
-
-    socket.on('sendLocation', (coords, callback) => {
-        io.emit('locationMessage', generateLocationMessage(`https://google.com/maps?=${coords.latitude},${coords.longitude}`))
-        callback()
-    })
-
-    socket.on('disconnect', () => {
-        io.emit('message', generateMessage('A user has left!')) // when user left
-    })
-})
-//complete loc
+    //complete loc
 server.listen(port, () => {
     console.log(`Server is up on port ${port}`)
 })
-
